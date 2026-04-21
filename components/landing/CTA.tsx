@@ -6,12 +6,13 @@ export function CTA() {
     <section id="about" className="border-b border-border/70 bg-surface">
       <div className="mx-auto max-w-content px-6 py-24 text-center md:py-32">
         <h2 className="hero-headline mx-auto max-w-3xl text-[36px] font-normal text-ink md:text-[56px]">
-          Improved access to legal information, for everyone.
+          Know your rights at work.
         </h2>
         <p className="mx-auto mt-6 max-w-reading text-lg text-muted">
-          AI Lawyer is built for non-professionals who need quick, understandable
-          answers. It&apos;s a companion to — not a replacement for — licensed
-          legal counsel.
+          AI Lawyer is built for Sri Lankan workers who need quick,
+          understandable answers about labour rights — a companion to, not a
+          replacement for, the Department of Labour (labourdept.gov.lk) or a
+          licensed attorney.
         </p>
         <div className="mt-10 flex justify-center">
           <Link

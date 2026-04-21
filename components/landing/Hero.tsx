@@ -6,18 +6,18 @@ export function Hero() {
     <section className="relative overflow-hidden border-b border-border/70">
       <div className="mx-auto max-w-content px-6 pb-24 pt-20 md:pb-32 md:pt-28">
         <p className="mb-6 text-sm font-medium uppercase tracking-[0.14em] text-subtle">
-          Introducing AI LawyerGPT
+          AI LawyerGPT · Sri Lankan labour law
         </p>
         <h1 className="hero-headline max-w-4xl text-[44px] font-normal text-ink md:text-[72px]">
-          Legal guidance,
+          Sri Lankan labour law,
           <br />
           in plain language.
         </h1>
         <p className="mt-8 max-w-reading text-lg text-muted md:text-xl">
-          A conversational assistant that understands everyday questions and
-          answers with simplified explanations of your rights under Sri Lankan
-          law. Draft complaint letters and request forms in minutes — without
-          hiring a lawyer.
+          A conversational assistant for Sri Lankan workers. Get clear answers
+          about unpaid wages, termination, EPF and ETF, gratuity, leave, and
+          more — and draft letters to the Department of Labour in minutes,
+          without hiring a lawyer.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-3">
           <Link

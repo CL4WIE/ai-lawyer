@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AI Lawyer — Legal guidance in plain language",
+  title: "AI Lawyer — Sri Lankan labour law in plain language",
   description:
-    "A conversational AI assistant that explains your rights under Sri Lankan law and helps you draft legal documents.",
+    "A conversational AI assistant that explains your rights under Sri Lankan labour law and helps you draft letters and complaints for the Department of Labour.",
 };
 
 export default function RootLayout({
