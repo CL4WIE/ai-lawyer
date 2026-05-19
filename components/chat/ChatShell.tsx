@@ -17,6 +17,24 @@ function makeTitle(firstUserMessage: string): string {
   return trimmed.length <= 48 ? trimmed : `${trimmed.slice(0, 45)}…`;
 }
 
+async function friendlyErrorMessage(res: Response): Promise<string> {
+  let serverMessage = "";
+  try {
+    const data = (await res.json()) as { error?: string };
+    if (data?.error) serverMessage = data.error;
+  } catch {
+    /* response body was not JSON */
+  }
+  if (serverMessage) return serverMessage;
+  if (res.status === 401)
+    return "The OpenAI API key is invalid. Please check your server configuration.";
+  if (res.status === 429)
+    return "The assistant is currently rate-limited or out of quota. Please try again shortly.";
+  if (res.status >= 500)
+    return "The assistant service is temporarily unavailable. Please try again in a moment.";
+  return "Sorry — I couldn't reach the assistant. Please try again in a moment.";
+}
+
 export function ChatShell({ initialDocumentId }: Props) {
   const [activeChatId, setActiveChatId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -57,18 +75,42 @@ export function ChatShell({ initialDocumentId }: Props) {
         setActiveChatId(chatId);
       }
 
+      const assistantId = createId();
+      const assistantPlaceholder: Message = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        createdAt: Date.now(),
+      };
+
       const nextAfterUser = [...messages, userMsg];
-      setMessages(nextAfterUser);
+      setMessages([...nextAfterUser, assistantPlaceholder]);
       setIsLoading(true);
 
       const chatSoFar: Chat = {
         id: chatId,
-        title: isFirstMessage ? makeTitle(text) : (getChat(chatId)?.title ?? makeTitle(text)),
+        title: isFirstMessage
+          ? makeTitle(text)
+          : (getChat(chatId)?.title ?? makeTitle(text)),
         messages: nextAfterUser,
         updatedAt: Date.now(),
       };
       saveChat(chatSoFar);
       bumpSidebar();
+
+      const finalize = (assistantContent: string) => {
+        const finalMsg: Message = {
+          ...assistantPlaceholder,
+          content: assistantContent,
+        };
+        const final = [...nextAfterUser, finalMsg];
+        saveChat({
+          ...chatSoFar,
+          messages: final,
+          updatedAt: Date.now(),
+        });
+        bumpSidebar();
+      };
 
       try {
         const res = await fetch("/api/chat", {
@@ -81,33 +123,51 @@ export function ChatShell({ initialDocumentId }: Props) {
             })),
           }),
         });
-        const data = (await res.json()) as { role: "assistant"; content: string };
-        const botMsg: Message = {
-          id: createId(),
-          role: "assistant",
-          content: data.content,
-          createdAt: Date.now(),
-        };
-        const final = [...nextAfterUser, botMsg];
-        setMessages(final);
-        saveChat({
-          ...chatSoFar,
-          messages: final,
-          updatedAt: Date.now(),
-        });
-        bumpSidebar();
-      } catch {
-        const botMsg: Message = {
-          id: createId(),
-          role: "assistant",
-          content:
-            "Sorry — I couldn't reach the assistant. Please try again in a moment.",
-          createdAt: Date.now(),
-        };
-        const final = [...nextAfterUser, botMsg];
-        setMessages(final);
-        saveChat({ ...chatSoFar, messages: final, updatedAt: Date.now() });
-        bumpSidebar();
+
+        if (!res.ok || !res.body) {
+          const errorMsg = await friendlyErrorMessage(res);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: errorMsg } : m,
+            ),
+          );
+          finalize(errorMsg);
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let acc = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          acc += decoder.decode(value, { stream: true });
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: acc } : m,
+            ),
+          );
+        }
+        acc += decoder.decode();
+        if (!acc) {
+          acc = "_The assistant returned no content. Please try again._";
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: acc } : m,
+            ),
+          );
+        }
+        finalize(acc);
+      } catch (error) {
+        console.error("Error in handleSend", error);
+        const errorMsg =
+          "Sorry — I couldn't reach the assistant. Please check your connection and try again.";
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: errorMsg } : m,
+          ),
+        );
+        finalize(errorMsg);
       } finally {
         setIsLoading(false);
       }
@@ -115,7 +175,7 @@ export function ChatShell({ initialDocumentId }: Props) {
     [messages, bumpSidebar],
   );
 
-  const isEmpty = messages.length === 0 && !isLoading;
+  const isEmpty = messages.length === 0;
 
   const suggestions = useMemo(
     () => [
@@ -171,7 +231,7 @@ export function ChatShell({ initialDocumentId }: Props) {
         ) : (
           <>
             <div className="chat-scroll flex-1 overflow-y-auto">
-              <MessageList messages={messages} isLoading={isLoading} />
+              <MessageList messages={messages} />
             </div>
             <Composer onSend={handleSend} disabled={isLoading} />
           </>

@@ -84,6 +84,7 @@ function renderInline(text: string): React.ReactNode {
 
 export function MessageBubble({ message }: Props) {
   const isUser = message.role === "user";
+  const isEmptyAssistant = !isUser && message.content.length === 0;
   return (
     <div
       className={cn(
@@ -106,6 +107,18 @@ export function MessageBubble({ message }: Props) {
       >
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
+        ) : isEmptyAssistant ? (
+          <div className="flex items-center gap-1 pt-3" aria-label="Thinking">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-subtle" />
+            <span
+              className="h-2 w-2 animate-pulse rounded-full bg-subtle"
+              style={{ animationDelay: "120ms" }}
+            />
+            <span
+              className="h-2 w-2 animate-pulse rounded-full bg-subtle"
+              style={{ animationDelay: "240ms" }}
+            />
+          </div>
         ) : (
           <div>{renderContent(message.content)}</div>
         )}
