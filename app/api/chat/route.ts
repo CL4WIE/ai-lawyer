@@ -7,6 +7,7 @@ import {
   getModel,
   type IncomingMessage,
 } from "@/lib/llm";
+import { retrieveContext } from "@/lib/rag";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,9 +27,21 @@ export async function POST(req: Request) {
     );
   }
 
+  // Find the latest user message to use as the RAG query.
+  const history = Array.isArray(body.messages) ? body.messages : [];
+  const lastUserMessage = [...history].reverse().find((m) => m.role === "user");
+
+  console.log("[Chat] User request:", lastUserMessage?.content ?? "(none)");
+
+  const ragContext = lastUserMessage
+    ? await retrieveContext(lastUserMessage.content)
+    : "";
+
   const client = getLLMClient();
   const model = getModel();
-  const messages = buildMessages(body.messages);
+  const messages = buildMessages(body.messages, ragContext || undefined);
+
+  console.log("[Chat] System prompt:\n", messages[0]?.content);
 
   let completion: Awaited<
     ReturnType<typeof client.chat.completions.create>
@@ -47,18 +60,23 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let fullResponse = "";
       try {
         if (Symbol.asyncIterator in Object(completion)) {
           for await (const chunk of completion as AsyncIterable<{
             choices: { delta?: { content?: string | null } }[];
           }>) {
             const delta = chunk.choices[0]?.delta?.content;
-            if (delta) controller.enqueue(encoder.encode(delta));
+            if (delta) {
+              fullResponse += delta;
+              controller.enqueue(encoder.encode(delta));
+            }
           }
         }
       } catch {
         controller.enqueue(encoder.encode("\n\n_[stream interrupted]_"));
       } finally {
+        console.log("[Chat] LLM response:", fullResponse);
         controller.close();
       }
     },

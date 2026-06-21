@@ -27,11 +27,17 @@ export interface IncomingMessage {
 
 export function buildMessages(
   history: IncomingMessage[] | undefined,
+  ragContext?: string,
 ): ChatCompletionMessageParam[] {
   const safe = Array.isArray(history) ? history : [];
   const trimmed = safe.slice(-MAX_HISTORY);
+
+  const systemContent = ragContext
+    ? `${SYSTEM_PROMPT}\n\n---\nRELEVANT LAW EXCERPTS (retrieved from Sri Lankan labour legislation):\n\n${ragContext}\n\nUse these excerpts to inform your answer. Cite the act name and relevant excerpt number when quoting from them. Do not fabricate content beyond what the excerpts and your training support.`
+    : SYSTEM_PROMPT;
+
   return [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemContent },
     ...trimmed.map<ChatCompletionMessageParam>((m) => ({
       role: m.role,
       content: m.content,
