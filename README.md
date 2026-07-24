@@ -2,7 +2,7 @@
 
 A web-based AI legal conversational assistant focused on **Sri Lankan labour law**. It helps employees understand their rights in everyday language and generates letters and complaints they can send to their employer or the [Department of Labour](https://labourdept.gov.lk/).
 
-This repository contains the **Next.js 14 frontend** (App Router + TypeScript + Tailwind CSS). The chat is powered by a **locally running [Ollama](https://ollama.com/) server** via its OpenAI-compatible Chat Completions API, with streaming responses. Conversations and generated documents are persisted in the browser's `localStorage` (no auth, no database).
+This repository contains the **Next.js 14 frontend** (App Router + TypeScript + Tailwind CSS). The chat is powered by the **Google Gemini API** via its OpenAI-compatible Chat Completions API, with streaming responses. Conversations and generated documents are persisted in the browser's `localStorage` (no auth, no database).
 
 ## What the assistant covers
 
@@ -39,44 +39,39 @@ Off-topic questions are politely declined.
 
 ## Getting started
 
-### 1. Install and run Ollama
+### 1. Get a Gemini API key
 
-Download Ollama from [https://ollama.com/download](https://ollama.com/download), install it, then pull a model and start the server:
-
-```bash
-ollama pull llama3.2
-ollama serve   # usually started automatically by the installer
-```
-
-You can swap `llama3.2` for any chat-capable model (e.g. `llama3.1`, `qwen2.5`, `mistral`, `phi3`). Update `OLLAMA_MODEL` to match in `.env.local`.
-
-Verify Ollama is reachable:
-
-```bash
-curl http://localhost:11434/api/tags
-```
+Create a key at [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 
 ### 2. Run the frontend
 
 ```bash
 npm install
 cp .env.example .env.local
-# Edit .env.local if Ollama is on a different host/port or you want a different model
+# Edit .env.local and set GEMINI_API_KEY
 npm run dev
 ```
 
 Then open [http://localhost:3000](http://localhost:3000).
 
-> If Ollama is not running, or the configured model has not been pulled, the chat will reply with a clear error message telling you exactly what to do.
+> If `GEMINI_API_KEY` is missing or invalid, or the configured model name is wrong, the chat will reply with a clear error message telling you exactly what to do.
 
 ## Environment variables
 
 Configured in [.env.local](.env.local) (copy from [.env.example](.env.example)):
 
-| Variable           | Required | Default                       | Description                                                                                  |
-| ------------------ | -------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
-| `OLLAMA_BASE_URL`  | no       | `http://localhost:11434/v1`   | The base URL of Ollama's OpenAI-compatible API. Change this if Ollama runs on another host. |
-| `OLLAMA_MODEL`     | no       | `llama3.2`                    | The model name to use. Must already be pulled via `ollama pull <model>`.                    |
+| Variable             | Required | Default                                                        | Description                                                                          |
+| -------------------- | -------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`     | yes      | —                                                                | API key for the Google Gemini API.                                                    |
+| `GEMINI_MODEL`       | no       | `gemini-flash-lite-latest`                                       | The Gemini chat model to use.                                                          |
+| `GEMINI_EMBED_MODEL` | no       | `gemini-embedding-001`                                           | The Gemini embedding model used for RAG retrieval. Must match the ingestion pipeline. |
+| `GEMINI_BASE_URL`    | no       | `https://generativelanguage.googleapis.com/v1beta/openai/`      | Override only for a different OpenAI-compatible endpoint.                             |
+| `QDRANT_BASE_URL`    | no       | `http://localhost:6333`                                         | Base URL of the Qdrant vector database used for RAG retrieval.                        |
+| `QDRANT_API_KEY`     | no       | —                                                                | Required only when Qdrant is deployed with an API key (production). See [../DEPLOY.md](../DEPLOY.md). |
+
+## Deploying
+
+For running this app plus Qdrant on a VPS behind HTTPS, see [../DEPLOY.md](../DEPLOY.md).
 
 ## Scripts
 
@@ -97,7 +92,7 @@ app/
   chat/
     page.tsx                 AI LawyerGPT conversational UI
     documents/[id]/page.tsx  Document viewer/editor
-  api/chat/route.ts          Ollama streaming chat endpoint
+  api/chat/route.ts          Gemini streaming chat endpoint
 components/
   landing/                   Navbar, Hero, Features, CTA, Disclaimer, Footer
   chat/                      Sidebar, ChatShell, ChatHeader, MessageList,
@@ -106,7 +101,7 @@ components/
   ui/                        Button
 lib/
   cn.ts                      class name helper
-  llm.ts                     Ollama client (via OpenAI SDK), system prompt, message builder
+  llm.ts                     Gemini client (via OpenAI SDK), system prompt, message builder
   storage.ts                 localStorage persistence (SSR-safe)
   documentTemplates.ts       Labour Department complaint, RTI, and blank templates
 types/
@@ -116,20 +111,20 @@ types/
 ## How the chat works
 
 ```
-Browser  ──POST /api/chat──▶  Route Handler  ──stream:true──▶  Ollama (localhost:11434)
+Browser  ──POST /api/chat──▶  Route Handler  ──stream:true──▶  Gemini API
    ▲                                │
    └────── ReadableStream of UTF-8 text chunks (Content-Type: text/plain) ─────┘
 ```
 
 1. `ChatShell` POSTs the conversation history to `/api/chat`.
-2. The route prepends the labour-law system prompt and forwards the last ~20 messages to the local Ollama server (OpenAI-compatible `/v1/chat/completions` endpoint) with `stream: true`.
+2. The route prepends the labour-law system prompt and forwards the last ~20 messages to the Gemini API (OpenAI-compatible `/chat/completions` endpoint) with `stream: true`.
 3. The route streams the delta tokens straight back to the client as plain UTF-8 chunks.
 4. The client appends each chunk to the in-progress assistant message and persists the final result to `localStorage`.
-5. Errors (Ollama not running, model not pulled, 5xx, network) are surfaced as a clear error message in the chat.
+5. Errors (missing/invalid API key, invalid model, 5xx, network) are surfaced as a clear error message in the chat.
 
 ## Swapping the model or provider
 
-To use a different local model, run `ollama pull <name>` and set `OLLAMA_MODEL=<name>` in `.env.local`. To switch to a hosted provider (OpenAI, Anthropic, etc.), update `OLLAMA_BASE_URL` and `apiKey` in [`lib/llm.ts`](lib/llm.ts) — the streaming response contract (`text/plain` chunked stream) stays the same, so the frontend does not need to change.
+To use a different Gemini model, set `GEMINI_MODEL=<name>` in `.env.local`. To switch to a different hosted provider (OpenAI, Anthropic, etc.), update `GEMINI_BASE_URL`/`apiKey` handling in [`lib/llm.ts`](lib/llm.ts) — the streaming response contract (`text/plain` chunked stream) stays the same, so the frontend does not need to change.
 
 ## Disclaimer
 

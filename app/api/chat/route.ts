@@ -95,26 +95,29 @@ function handleLLMError(err: unknown, model: string): Response {
   if (err instanceof OpenAI.APIConnectionError) {
     return NextResponse.json(
       {
-        error: `Could not connect to the Ollama server at ${getBaseURL()}. Make sure Ollama is running (try 'ollama serve' in a terminal).`,
+        error: `Could not connect to the Gemini API at ${getBaseURL()}. Check your network connection and that GEMINI_API_KEY is set.`,
       },
       { status: 503 },
     );
   }
   if (err instanceof OpenAI.APIError) {
     const status = err.status ?? 502;
-    let message = err.message || "The local LLM returned an error.";
-    if (status === 404) {
-      message = `Model '${model}' is not available on the Ollama server. Pull it first with: ollama pull ${model}`;
+    let message = err.message || "The Gemini API returned an error.";
+    if (status === 401 || status === 403) {
+      message =
+        "Gemini API authentication failed. Check that GEMINI_API_KEY is set and valid.";
+    } else if (status === 404) {
+      message = `Model '${model}' is not a valid Gemini model. Check the GEMINI_MODEL environment variable.`;
     } else if (status >= 500) {
       message =
-        "The Ollama server is temporarily unavailable. Please try again in a moment.";
+        "The Gemini API is temporarily unavailable. Please try again in a moment.";
     }
     return NextResponse.json({ error: message }, { status });
   }
   return NextResponse.json(
     {
       error:
-        "Sorry — I couldn't reach the local assistant. Make sure Ollama is running and the model is pulled.",
+        "Sorry — I couldn't reach the Gemini API. Check that GEMINI_API_KEY is set correctly.",
     },
     { status: 502 },
   );

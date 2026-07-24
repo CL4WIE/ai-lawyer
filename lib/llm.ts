@@ -48,26 +48,27 @@ export function buildMessages(
 let cachedClient: OpenAI | null = null;
 
 /**
- * Returns an OpenAI SDK client configured for a local Ollama server.
- * Ollama exposes an OpenAI-compatible Chat Completions API at
- * `${OLLAMA_BASE_URL}/chat/completions`, so the same SDK we used for
- * OpenAI works against Ollama with only the baseURL changed.
+ * Returns an OpenAI SDK client configured for Google Gemini's
+ * OpenAI-compatible API, so the same SDK we'd use for OpenAI works
+ * against Gemini with only the baseURL and API key changed.
  */
 export function getLLMClient(): OpenAI {
   if (!cachedClient) {
     cachedClient = new OpenAI({
       baseURL: getBaseURL(),
-      // Ollama does not require an API key, but the SDK insists on one.
-      apiKey: "ollama",
+      apiKey: process.env.GEMINI_API_KEY,
     });
   }
   return cachedClient;
 }
 
 export function getBaseURL(): string {
-  return process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1";
+  return (
+    process.env.GEMINI_BASE_URL ||
+    "https://generativelanguage.googleapis.com/v1beta/openai/"
+  );
 }
 
 export function getModel(): string {
-  return process.env.OLLAMA_MODEL || "llama3.2";
+  return process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
 }

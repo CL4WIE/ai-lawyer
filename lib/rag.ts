@@ -1,10 +1,12 @@
-const OLLAMA_BASE =
-  (process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1").replace(
-    /\/v1\/?$/,
-    "",
-  );
+import { getLLMClient } from "@/lib/llm";
+
 const QDRANT_BASE = process.env.QDRANT_BASE_URL ?? "http://localhost:6333";
-const EMBED_MODEL = "mxbai-embed-large:latest";
+// Required when Qdrant is deployed with QDRANT__SERVICE__API_KEY set (e.g.
+// production). Unset locally, where Qdrant runs without auth.
+const QDRANT_API_KEY = process.env.QDRANT_API_KEY;
+// Must match whatever embedding model/dimensions the ingestion script used
+// to populate the `labour-laws` Qdrant collection.
+const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 const COLLECTION = "labour-laws";
 const TOP_K = 5;
 
@@ -25,14 +27,12 @@ interface QdrantHit {
 }
 
 async function embedQuery(query: string): Promise<number[]> {
-  const res = await fetch(`${OLLAMA_BASE}/api/embeddings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: EMBED_MODEL, prompt: query }),
+  const client = getLLMClient();
+  const res = await client.embeddings.create({
+    model: EMBED_MODEL,
+    input: query,
   });
-  if (!res.ok) throw new Error(`Ollama embedding failed (${res.status})`);
-  const data = (await res.json()) as { embedding: number[] };
-  return data.embedding;
+  return res.data[0].embedding;
 }
 
 async function searchQdrant(vector: number[]): Promise<QdrantHit[]> {
@@ -40,7 +40,10 @@ async function searchQdrant(vector: number[]): Promise<QdrantHit[]> {
     `${QDRANT_BASE}/collections/${COLLECTION}/points/search`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(QDRANT_API_KEY ? { "api-key": QDRANT_API_KEY } : {}),
+      },
       body: JSON.stringify({ vector, limit: TOP_K, with_payload: true }),
     },
   );
