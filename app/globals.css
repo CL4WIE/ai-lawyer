@@ -4,6 +4,34 @@
 
 :root {
   color-scheme: light;
+
+  --canvas: 255 255 255;
+  --surface: 246 247 250;
+  --sidebar: 249 250 252;
+  --sidebar-hover: 237 240 245;
+  --ink: 15 23 42;
+  --muted: 71 85 105;
+  --subtle: 148 163 184;
+  --border: 226 232 240;
+  --accent: 191 141 54;
+  --accent-hover: 168 122 44;
+  --accent-ink: 15 23 42;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas: 8 13 24;
+  --surface: 15 22 38;
+  --sidebar: 11 17 30;
+  --sidebar-hover: 24 33 54;
+  --ink: 241 245 249;
+  --muted: 148 163 184;
+  --subtle: 90 103 125;
+  --border: 30 41 59;
+  --accent: 224 178 90;
+  --accent-hover: 237 195 112;
+  --accent-ink: 12 17 28;
 }
 
 html,
@@ -12,21 +40,22 @@ body {
 }
 
 body {
-  background-color: #ffffff;
-  color: #0d0d0d;
+  background-color: rgb(var(--canvas));
+  color: rgb(var(--ink));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "ss01", "cv11";
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 ::selection {
-  background-color: #0d0d0d;
-  color: #ffffff;
+  background-color: rgb(var(--accent));
+  color: rgb(var(--accent-ink));
 }
 
 .chat-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #d4d4d4 transparent;
+  scrollbar-color: rgb(var(--border)) transparent;
 }
 
 .chat-scroll::-webkit-scrollbar {
@@ -35,7 +64,7 @@ body {
 }
 
 .chat-scroll::-webkit-scrollbar-thumb {
-  background-color: #d4d4d4;
+  background-color: rgb(var(--border));
   border-radius: 9999px;
 }
 

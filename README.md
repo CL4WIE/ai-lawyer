@@ -2,7 +2,7 @@
 
 A web-based AI legal conversational assistant focused on **Sri Lankan labour law**. It helps employees understand their rights in everyday language and generates letters and complaints they can send to their employer or the [Department of Labour](https://labourdept.gov.lk/).
 
-This repository contains the **Next.js 14 frontend** (App Router + TypeScript + Tailwind CSS). The chat is powered by the **Google Gemini API** via its OpenAI-compatible Chat Completions API, with streaming responses. Conversations and generated documents are persisted in the browser's `localStorage` (no auth, no database).
+This repository contains the **Next.js 14 frontend** (App Router + TypeScript + Tailwind CSS). The chat is powered by the **Google Gemini API** via its OpenAI-compatible Chat Completions API, with streaming responses. Access to `/chat` requires signing in (email + password via Auth.js), and each user's conversations and generated documents are persisted server-side in PostgreSQL, scoped to their account.
 
 ## What the assistant covers
 
@@ -43,16 +43,26 @@ Off-topic questions are politely declined.
 
 Create a key at [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 
-### 2. Run the frontend
+### 2. Start a local Postgres database
+
+```bash
+docker compose -f ../docker-compose.yml up -d postgres
+```
+
+Or point `DATABASE_URL` (below) at any Postgres instance you already have running.
+
+### 3. Run the frontend
 
 ```bash
 npm install
 cp .env.example .env.local
-# Edit .env.local and set GEMINI_API_KEY
+# Edit .env.local: set GEMINI_API_KEY, DATABASE_URL, and AUTH_SECRET
+# (generate AUTH_SECRET with: openssl rand -base64 32)
+npx prisma migrate dev
 npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000).
+Then open [http://localhost:3000](http://localhost:3000) and sign up for an account at `/signup` — `/chat` requires being signed in.
 
 > If `GEMINI_API_KEY` is missing or invalid, or the configured model name is wrong, the chat will reply with a clear error message telling you exactly what to do.
 
@@ -68,6 +78,9 @@ Configured in [.env.local](.env.local) (copy from [.env.example](.env.example)):
 | `GEMINI_BASE_URL`    | no       | `https://generativelanguage.googleapis.com/v1beta/openai/`      | Override only for a different OpenAI-compatible endpoint.                             |
 | `QDRANT_BASE_URL`    | no       | `http://localhost:6333`                                         | Base URL of the Qdrant vector database used for RAG retrieval.                        |
 | `QDRANT_API_KEY`     | no       | —                                                                | Required only when Qdrant is deployed with an API key (production). See [../DEPLOY.md](../DEPLOY.md). |
+| `DATABASE_URL`       | yes      | —                                                                 | Postgres connection string for user accounts and chat/document history.               |
+| `AUTH_SECRET`        | yes      | —                                                                 | Secret used by Auth.js to sign/encrypt session tokens. Generate with `openssl rand -base64 32`. |
+| `AUTH_TRUST_HOST`    | no       | —                                                                 | Set to `true` in production behind a reverse proxy (see [../docker-compose.yml](../docker-compose.yml)). |
 
 ## Deploying
 
@@ -89,12 +102,18 @@ app/
   layout.tsx                 Root layout, fonts, metadata
   page.tsx                   Landing page
   globals.css                Tailwind + global styles
+  login/, signup/             Auth pages
   chat/
-    page.tsx                 AI LawyerGPT conversational UI
-    documents/[id]/page.tsx  Document viewer/editor
-  api/chat/route.ts          Gemini streaming chat endpoint
+    page.tsx                 AI LawyerGPT conversational UI (session-gated)
+    documents/[id]/page.tsx  Document viewer/editor (session-gated)
+  api/
+    auth/[...nextauth]/route.ts  Auth.js handlers
+    signup/route.ts              Account creation
+    chat/route.ts                 Gemini streaming chat endpoint
+    chats/, documents/            CRUD for per-user chats/messages/documents
 components/
   landing/                   Navbar, Hero, Features, CTA, Disclaimer, Footer
+  auth/                      LoginForm, SignupForm
   chat/                      Sidebar, ChatShell, ChatHeader, MessageList,
                              MessageBubble, Composer, NewDocumentModal,
                              DocumentView, UserCard
@@ -102,25 +121,31 @@ components/
 lib/
   cn.ts                      class name helper
   llm.ts                     Gemini client (via OpenAI SDK), system prompt, message builder
-  storage.ts                 localStorage persistence (SSR-safe)
+  prisma.ts                  Prisma client singleton
+  serialize.ts, serializeDocument.ts  Prisma → wire-type mappers
   documentTemplates.ts       Labour Department complaint, RTI, and blank templates
+prisma/
+  schema.prisma              User, Chat, Message, Document models
 types/
   index.ts                   Chat, Message, LegalDocument types
+auth.ts, auth.config.ts      Auth.js v5 configuration
+middleware.ts                Redirects unauthenticated users away from /chat
 ```
 
 ## How the chat works
 
 ```
-Browser  ──POST /api/chat──▶  Route Handler  ──stream:true──▶  Gemini API
+Browser  ──POST /api/chat { chatId, messages }──▶  Route Handler  ──stream:true──▶  Gemini API
    ▲                                │
    └────── ReadableStream of UTF-8 text chunks (Content-Type: text/plain) ─────┘
 ```
 
-1. `ChatShell` POSTs the conversation history to `/api/chat`.
-2. The route prepends the labour-law system prompt and forwards the last ~20 messages to the Gemini API (OpenAI-compatible `/chat/completions` endpoint) with `stream: true`.
-3. The route streams the delta tokens straight back to the client as plain UTF-8 chunks.
-4. The client appends each chunk to the in-progress assistant message and persists the final result to `localStorage`.
-5. Errors (missing/invalid API key, invalid model, 5xx, network) are surfaced as a clear error message in the chat.
+1. `middleware.ts` and `app/chat/page.tsx` require a signed-in session before `/chat` renders.
+2. `ChatShell` creates the chat (`POST /api/chats`) if needed, persists the user's message (`POST /api/chats/:id/messages`), then POSTs the conversation history plus `chatId` to `/api/chat`.
+3. The route verifies the chat belongs to the signed-in user, prepends the labour-law system prompt, and forwards the last ~20 messages to the Gemini API (OpenAI-compatible `/chat/completions` endpoint) with `stream: true`.
+4. The route streams the delta tokens straight back to the client as plain UTF-8 chunks, and once the stream ends, persists the full assistant reply to Postgres via Prisma.
+5. The client appends each chunk to the in-progress assistant message as it arrives.
+6. Errors (missing/invalid API key, invalid model, 5xx, network) are surfaced as a clear error message in the chat.
 
 ## Swapping the model or provider
 

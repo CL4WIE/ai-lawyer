@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { TEMPLATES, getTemplate } from "@/lib/documentTemplates";
-import { createId, saveDocument } from "@/lib/storage";
 import type { DocumentTemplate, LegalDocument } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
@@ -39,20 +38,20 @@ export function NewDocumentModal({ open, onClose, onCreated }: Props) {
   const template = getTemplate(templateId);
   if (!template) return null;
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!template) return;
     const content = template.render(values);
     const title =
       values.title?.trim() ||
       `${template.label}${values.name ? ` — ${values.name}` : ""}`;
-    const doc: LegalDocument = {
-      id: createId(),
-      title,
-      template: template.id,
-      content,
-      updatedAt: Date.now(),
-    };
-    saveDocument(doc);
+
+    const res = await fetch("/api/documents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, template: template.id, content }),
+    });
+    if (!res.ok) return;
+    const doc = (await res.json()) as LegalDocument;
     onCreated(doc);
     onClose();
   }
@@ -92,7 +91,7 @@ export function NewDocumentModal({ open, onClose, onCreated }: Props) {
                   className={cn(
                     "rounded-xl border px-4 py-3 text-left transition",
                     templateId === t.id
-                      ? "border-ink bg-surface"
+                      ? "border-accent bg-surface"
                       : "border-border hover:bg-surface",
                   )}
                 >
@@ -123,7 +122,7 @@ export function NewDocumentModal({ open, onClose, onCreated }: Props) {
                     }
                     placeholder={f.placeholder}
                     rows={4}
-                    className="w-full resize-none rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-ink focus:outline-none"
+                    className="w-full resize-none rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-accent focus:outline-none"
                   />
                 ) : (
                   <input
@@ -134,7 +133,7 @@ export function NewDocumentModal({ open, onClose, onCreated }: Props) {
                       setValues((v) => ({ ...v, [f.id]: e.target.value }))
                     }
                     placeholder={f.placeholder}
-                    className="w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-ink focus:outline-none"
+                    className="w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-subtle focus:border-accent focus:outline-none"
                   />
                 )}
               </div>

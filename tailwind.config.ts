@@ -10,15 +10,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        canvas: "#ffffff",
-        surface: "#f7f7f8",
-        sidebar: "#f9f9f9",
-        sidebarHover: "#ececec",
-        ink: "#0d0d0d",
-        muted: "#5d5d5d",
-        subtle: "#8e8ea0",
-        border: "#e5e5e5",
-        accent: "#0b5fff",
+        canvas: "rgb(var(--canvas) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        sidebar: "rgb(var(--sidebar) / <alpha-value>)",
+        sidebarHover: "rgb(var(--sidebar-hover) / <alpha-value>)",
+        ink: "rgb(var(--ink) / <alpha-value>)",
+        muted: "rgb(var(--muted) / <alpha-value>)",
+        subtle: "rgb(var(--subtle) / <alpha-value>)",
+        border: "rgb(var(--border) / <alpha-value>)",
+        accent: "rgb(var(--accent) / <alpha-value>)",
+        accentHover: "rgb(var(--accent-hover) / <alpha-value>)",
+        accentInk: "rgb(var(--accent-ink) / <alpha-value>)",
       },
       fontFamily: {
         sans: [

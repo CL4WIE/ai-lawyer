@@ -5,11 +5,11 @@ import { ChatHeader } from "./ChatHeader";
 import { Composer } from "./Composer";
 import { MessageList } from "./MessageList";
 import { Sidebar } from "./Sidebar";
-import { createId, getChat, saveChat } from "@/lib/storage";
 import type { Chat, Message } from "@/types";
 
 interface Props {
   initialDocumentId?: string;
+  user: { name: string | null; email: string };
 }
 
 function makeTitle(firstUserMessage: string): string {
@@ -35,7 +35,7 @@ async function friendlyErrorMessage(res: Response): Promise<string> {
   return "Sorry — I couldn't reach the assistant. Please try again in a moment.";
 }
 
-export function ChatShell({ initialDocumentId }: Props) {
+export function ChatShell({ initialDocumentId, user }: Props) {
   const [activeChatId, setActiveChatId] = useState<string | undefined>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,31 +51,39 @@ export function ChatShell({ initialDocumentId }: Props) {
     setMessages([]);
   }, []);
 
-  const handleSelectChat = useCallback((id: string) => {
-    const c = getChat(id);
-    if (!c) return;
+  const handleSelectChat = useCallback(async (id: string) => {
+    const res = await fetch(`/api/chats/${id}`);
+    if (!res.ok) return;
+    const chat = (await res.json()) as Chat;
     setActiveChatId(id);
-    setMessages(c.messages);
+    setMessages(chat.messages);
   }, []);
 
   const handleSend = useCallback(
     async (text: string) => {
+      const localUserId = `local-${Date.now()}`;
       const userMsg: Message = {
-        id: createId(),
+        id: localUserId,
         role: "user",
         content: text,
         createdAt: Date.now(),
       };
 
       let chatId = chatIdRef.current;
-      const isFirstMessage = !chatId;
       if (!chatId) {
-        chatId = createId();
+        const createRes = await fetch("/api/chats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: makeTitle(text) }),
+        });
+        if (!createRes.ok) return;
+        const created = (await createRes.json()) as Chat;
+        chatId = created.id;
         chatIdRef.current = chatId;
         setActiveChatId(chatId);
       }
 
-      const assistantId = createId();
+      const assistantId = `local-${Date.now()}-assistant`;
       const assistantPlaceholder: Message = {
         id: assistantId,
         role: "assistant",
@@ -87,28 +95,19 @@ export function ChatShell({ initialDocumentId }: Props) {
       setMessages([...nextAfterUser, assistantPlaceholder]);
       setIsLoading(true);
 
-      const chatSoFar: Chat = {
-        id: chatId,
-        title: isFirstMessage
-          ? makeTitle(text)
-          : (getChat(chatId)?.title ?? makeTitle(text)),
-        messages: nextAfterUser,
-        updatedAt: Date.now(),
-      };
-      saveChat(chatSoFar);
+      await fetch(`/api/chats/${chatId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "user", content: text }),
+      });
       bumpSidebar();
 
       const finalize = (assistantContent: string) => {
-        const finalMsg: Message = {
-          ...assistantPlaceholder,
-          content: assistantContent,
-        };
-        const final = [...nextAfterUser, finalMsg];
-        saveChat({
-          ...chatSoFar,
-          messages: final,
-          updatedAt: Date.now(),
-        });
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: assistantContent } : m,
+          ),
+        );
         bumpSidebar();
       };
 
@@ -117,6 +116,7 @@ export function ChatShell({ initialDocumentId }: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            chatId,
             messages: nextAfterUser.map((m) => ({
               role: m.role,
               content: m.content,
@@ -126,11 +126,6 @@ export function ChatShell({ initialDocumentId }: Props) {
 
         if (!res.ok || !res.body) {
           const errorMsg = await friendlyErrorMessage(res);
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: errorMsg } : m,
-            ),
-          );
           finalize(errorMsg);
           return;
         }
@@ -151,22 +146,12 @@ export function ChatShell({ initialDocumentId }: Props) {
         acc += decoder.decode();
         if (!acc) {
           acc = "_The assistant returned no content. Please try again._";
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: acc } : m,
-            ),
-          );
         }
         finalize(acc);
       } catch (error) {
         console.error("Error in handleSend", error);
         const errorMsg =
           "Sorry — I couldn't reach the assistant. Please check your connection and try again.";
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, content: errorMsg } : m,
-          ),
-        );
         finalize(errorMsg);
       } finally {
         setIsLoading(false);
@@ -201,6 +186,7 @@ export function ChatShell({ initialDocumentId }: Props) {
         onSelectChat={handleSelectChat}
         onNewChat={handleNewChat}
         refreshKey={sidebarKey}
+        user={user}
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <ChatHeader onNewChat={handleNewChat} />

@@ -1,13 +1,22 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 
 export function Hero() {
   return (
     <section className="relative overflow-hidden border-b border-border/70">
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.06]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 1px 1px, rgb(var(--accent)) 1px, transparent 0)",
+          backgroundSize: "28px 28px",
+        }}
+      />
       <div className="mx-auto max-w-content px-6 pb-24 pt-20 md:pb-32 md:pt-28">
-        <p className="mb-6 text-sm font-medium uppercase tracking-[0.14em] text-subtle">
-          AI LawyerGPT · Sri Lankan labour law
-        </p>
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.1em] text-accent">
+          <Sparkles className="h-3.5 w-3.5" strokeWidth={2} />
+          AI-powered labour law intelligence
+        </div>
         <h1 className="hero-headline max-w-4xl text-[44px] font-normal text-ink md:text-[72px]">
           Sri Lankan labour law,
           <br />
@@ -22,9 +31,9 @@ export function Hero() {
         <div className="mt-10 flex flex-wrap items-center gap-3">
           <Link
             href="/chat"
-            className="group inline-flex h-12 items-center gap-2 rounded-full bg-ink px-6 text-[15px] font-medium text-white transition hover:bg-black/85"
+            className="group inline-flex h-12 items-center gap-2 rounded-full bg-accent px-6 text-[15px] font-medium text-accentInk transition hover:bg-accentHover"
           >
-            Try AI LawyerGPT
+            Try LegalEase
             <ArrowRight
               className="h-4 w-4 transition group-hover:translate-x-0.5"
               strokeWidth={2}

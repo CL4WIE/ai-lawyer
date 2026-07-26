@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import {
   buildMessages,
   getBaseURL,
@@ -13,10 +15,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface Incoming {
+  chatId?: string;
   messages?: IncomingMessage[];
 }
 
 export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: Incoming;
   try {
     body = (await req.json()) as Incoming;
@@ -25,6 +33,15 @@ export async function POST(req: Request) {
       { error: "Invalid JSON body." },
       { status: 400 },
     );
+  }
+
+  const chatId = body.chatId;
+  if (!chatId) {
+    return NextResponse.json({ error: "chatId is required." }, { status: 400 });
+  }
+  const chat = await prisma.chat.findUnique({ where: { id: chatId } });
+  if (!chat || chat.userId !== session.user.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   // Find the latest user message to use as the RAG query.
@@ -77,6 +94,15 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode("\n\n_[stream interrupted]_"));
       } finally {
         console.log("[Chat] LLM response:", fullResponse);
+        if (fullResponse) {
+          await prisma.message.create({
+            data: { chatId, role: "assistant", content: fullResponse },
+          });
+          await prisma.chat.update({
+            where: { id: chatId },
+            data: { updatedAt: new Date() },
+          });
+        }
         controller.close();
       }
     },

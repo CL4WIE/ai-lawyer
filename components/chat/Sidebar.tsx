@@ -13,12 +13,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import {
-  deleteChat,
-  deleteDocument,
-  getChats,
-  getDocuments,
-} from "@/lib/storage";
 import type { Chat, LegalDocument } from "@/types";
 import { NewDocumentModal } from "./NewDocumentModal";
 import { UserCard } from "./UserCard";
@@ -29,6 +23,7 @@ interface SidebarProps {
   onSelectChat?: (chatId: string) => void;
   onNewChat?: () => void;
   refreshKey?: number;
+  user?: { name: string | null; email: string };
 }
 
 export function Sidebar({
@@ -37,6 +32,7 @@ export function Sidebar({
   onSelectChat,
   onNewChat,
   refreshKey = 0,
+  user,
 }: SidebarProps) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -46,9 +42,13 @@ export function Sidebar({
   const [documents, setDocuments] = useState<LegalDocument[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
 
-  function refresh() {
-    setChats(getChats());
-    setDocuments(getDocuments());
+  async function refresh() {
+    const [chatsRes, docsRes] = await Promise.all([
+      fetch("/api/chats"),
+      fetch("/api/documents"),
+    ]);
+    setChats(chatsRes.ok ? await chatsRes.json() : []);
+    setDocuments(docsRes.ok ? await docsRes.json() : []);
   }
 
   useEffect(() => {
@@ -90,8 +90,8 @@ export function Sidebar({
             href="/"
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-semibold text-ink hover:bg-sidebarHover"
           >
-            <Scale className="h-4 w-4" strokeWidth={1.75} />
-            AI Lawyer
+            <Scale className="h-4 w-4 text-accent" strokeWidth={1.75} />
+            LegalEase
           </Link>
           <button
             onClick={() => setCollapsed(true)}
@@ -124,7 +124,7 @@ export function Sidebar({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search…"
               autoFocus
-              className="mt-1 w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 text-sm text-ink placeholder:text-subtle focus:border-ink focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 text-sm text-ink placeholder:text-subtle focus:border-accent focus:outline-none"
             />
           )}
         </div>
@@ -168,9 +168,9 @@ export function Sidebar({
                       <span className="truncate">{d.title}</span>
                     </Link>
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.preventDefault();
-                        deleteDocument(d.id);
+                        await fetch(`/api/documents/${d.id}`, { method: "DELETE" });
                         refresh();
                         if (activeDocumentId === d.id) router.push("/chat");
                       }}
@@ -207,8 +207,8 @@ export function Sidebar({
                       <span className="truncate">{c.title}</span>
                     </button>
                     <button
-                      onClick={() => {
-                        deleteChat(c.id);
+                      onClick={async () => {
+                        await fetch(`/api/chats/${c.id}`, { method: "DELETE" });
                         refresh();
                         if (activeChatId === c.id) onNewChat?.();
                       }}
@@ -225,7 +225,7 @@ export function Sidebar({
         </div>
 
         <div className="border-t border-border/80 px-2 py-2">
-          <UserCard />
+          {user && <UserCard user={user} />}
         </div>
       </aside>
 

@@ -5,18 +5,14 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, Copy, Download } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { Button } from "@/components/ui/Button";
-import {
-  deleteDocument,
-  getDocument,
-  saveDocument,
-} from "@/lib/storage";
 import type { LegalDocument } from "@/types";
 
 interface Props {
   documentId: string;
+  user?: { name: string | null; email: string };
 }
 
-export function DocumentView({ documentId }: Props) {
+export function DocumentView({ documentId, user }: Props) {
   const router = useRouter();
   const [doc, setDoc] = useState<LegalDocument | null | undefined>(undefined);
   const [title, setTitle] = useState("");
@@ -25,29 +21,38 @@ export function DocumentView({ documentId }: Props) {
   const [sidebarKey, setSidebarKey] = useState(0);
 
   useEffect(() => {
-    const d = getDocument(documentId);
-    if (d) {
+    let cancelled = false;
+    fetch(`/api/documents/${documentId}`).then(async (res) => {
+      if (cancelled) return;
+      if (!res.ok) {
+        setDoc(null);
+        return;
+      }
+      const d = (await res.json()) as LegalDocument;
       setDoc(d);
       setTitle(d.title);
       setContent(d.content);
-    } else {
-      setDoc(null);
-    }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [documentId]);
 
   useEffect(() => {
     if (!doc) return;
     if (title === doc.title && content === doc.content) return;
-    const t = setTimeout(() => {
-      const updated: LegalDocument = {
-        ...doc,
-        title: title.trim() || "Untitled Document",
-        content,
-        updatedAt: Date.now(),
-      };
-      saveDocument(updated);
-      setDoc(updated);
-      setSidebarKey((k) => k + 1);
+    const t = setTimeout(async () => {
+      const nextTitle = title.trim() || "Untitled Document";
+      const res = await fetch(`/api/documents/${doc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: nextTitle, content }),
+      });
+      if (res.ok) {
+        const updated = (await res.json()) as LegalDocument;
+        setDoc(updated);
+        setSidebarKey((k) => k + 1);
+      }
     }, 400);
     return () => clearTimeout(t);
   }, [title, content, doc]);
@@ -74,15 +79,19 @@ export function DocumentView({ documentId }: Props) {
     URL.revokeObjectURL(url);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!doc) return;
-    deleteDocument(doc.id);
+    await fetch(`/api/documents/${doc.id}`, { method: "DELETE" });
     router.push("/chat");
   }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-canvas">
-      <Sidebar activeDocumentId={documentId} refreshKey={sidebarKey} />
+      <Sidebar
+        activeDocumentId={documentId}
+        refreshKey={sidebarKey}
+        user={user}
+      />
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
           <button

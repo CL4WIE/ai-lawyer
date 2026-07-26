@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Scale } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Navbar() {
   return (
@@ -9,8 +10,10 @@ export function Navbar() {
           href="/"
           className="flex items-center gap-2 text-[15px] font-semibold tracking-tight"
         >
-          <Scale className="h-5 w-5" strokeWidth={1.75} />
-          <span>AI Lawyer</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accentInk">
+            <Scale className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <span>LegalEase</span>
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted md:flex">
           <a href="#product" className="hover:text-ink">
@@ -23,12 +26,15 @@ export function Navbar() {
             About
           </a>
         </nav>
-        <Link
-          href="/chat"
-          className="inline-flex h-9 items-center rounded-full bg-ink px-4 text-sm font-medium text-white transition hover:bg-black/85"
-        >
-          Try AI LawyerGPT
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link
+            href="/chat"
+            className="inline-flex h-9 items-center rounded-full bg-accent px-4 text-sm font-medium text-accentInk transition hover:bg-accentHover"
+          >
+            Try LegalEase
+          </Link>
+        </div>
       </div>
     </header>
   );

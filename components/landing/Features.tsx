@@ -48,7 +48,7 @@ function VisualCard({
 }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8">
-      <div className="mb-6 inline-flex h-10 w-10 items-center justify-center rounded-full bg-ink text-white">
+      <div className="mb-6 inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accentInk">
         {icon}
       </div>
       <div className="space-y-3">

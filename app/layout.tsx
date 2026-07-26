@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -9,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AI Lawyer — Sri Lankan labour law in plain language",
+  title: "LegalEase — Sri Lankan labour law in plain language",
   description:
     "A conversational AI assistant that explains your rights under Sri Lankan labour law and helps you draft letters and complaints for the Department of Labour.",
 };
@@ -20,9 +21,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body className="font-sans antialiased text-ink bg-canvas">
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

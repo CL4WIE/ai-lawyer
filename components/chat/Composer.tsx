@@ -84,7 +84,7 @@ export function Composer({ onSend, disabled, placeholder }: Props) {
           className={cn(
             "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition",
             canSend
-              ? "bg-ink text-white hover:bg-black/85"
+              ? "bg-accent text-accentInk hover:bg-accentHover"
               : "bg-sidebarHover text-subtle",
           )}
           aria-label="Send"
@@ -93,7 +93,7 @@ export function Composer({ onSend, disabled, placeholder }: Props) {
         </button>
       </div>
       <p className="mt-2 text-center text-[11px] text-subtle">
-        AI Lawyer may make mistakes. Verify important information with a
+        LegalEase may make mistakes. Verify important information with a
         qualified attorney.
       </p>
     </form>

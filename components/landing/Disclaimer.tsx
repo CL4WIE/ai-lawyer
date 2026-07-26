@@ -6,7 +6,7 @@ export function Disclaimer() {
       <div className="mx-auto flex max-w-content items-start gap-3 px-6 py-6 text-sm text-muted">
         <Info className="mt-0.5 h-4 w-4 flex-shrink-0" strokeWidth={1.75} />
         <p>
-          AI Lawyer provides general information about Sri Lankan labour law
+          LegalEase provides general information about Sri Lankan labour law
           and is not a substitute for advice from a licensed attorney or the
           Department of Labour (labourdept.gov.lk). For binding legal matters,
           please consult a qualified professional.
