@@ -16,11 +16,13 @@ interface Props {
 export function NewDocumentModal({ open, onClose, onCreated }: Props) {
   const [templateId, setTemplateId] = useState<DocumentTemplate>("complaint");
   const [values, setValues] = useState<Record<string, string>>({});
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     if (open) {
       setTemplateId("complaint");
       setValues({});
+      setIsGenerating(false);
     }
   }, [open]);
 
@@ -40,10 +42,32 @@ export function NewDocumentModal({ open, onClose, onCreated }: Props) {
 
   async function handleCreate() {
     if (!template) return;
-    const content = template.render(values);
     const title =
       values.title?.trim() ||
       `${template.label}${values.name ? ` — ${values.name}` : ""}`;
+
+    let content = template.render(values);
+
+    // The blank template has nothing for the LLM to improve (no address or
+    // issue field to polish) — skip straight to creating it.
+    if (template.id !== "custom") {
+      setIsGenerating(true);
+      try {
+        const genRes = await fetch("/api/documents/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ template: template.id, values }),
+        });
+        if (genRes.ok) {
+          const { content: generated } = (await genRes.json()) as { content: string };
+          if (generated) content = generated;
+        }
+      } catch {
+        // fall back to the raw template below
+      } finally {
+        setIsGenerating(false);
+      }
+    }
 
     const res = await fetch("/api/documents", {
       method: "POST",
@@ -142,10 +166,12 @@ export function NewDocumentModal({ open, onClose, onCreated }: Props) {
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-4">
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={isGenerating}>
             Cancel
           </Button>
-          <Button onClick={handleCreate}>Create document</Button>
+          <Button onClick={handleCreate} disabled={isGenerating}>
+            {isGenerating ? "Drafting…" : "Create document"}
+          </Button>
         </div>
       </div>
     </div>

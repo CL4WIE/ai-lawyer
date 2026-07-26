@@ -18,6 +18,19 @@ Always end every substantive answer with exactly this italic disclaimer on its o
 
 _Note: This is general information based on Sri Lankan labour law and is not a substitute for advice from a licensed attorney or the Department of Labour (https://labourdept.gov.lk/)._`;
 
+export const DOCUMENT_SYSTEM_PROMPT = `You are a legal drafting assistant that polishes formal letters for Sri Lankan labour law matters (complaints to the Department of Labour, Right to Information requests, and similar correspondence).
+
+You will be given a complete draft letter that already has the correct formal structure: recipient details, subject line, statutory references, and a closing/signature block. Your job is narrowly scoped to two things:
+
+1. Address formatting: if the sender's address appears as a single run-on line or awkwardly formatted text, reformat it into a proper multi-line Sri Lankan postal address block (e.g. house/street number and name on one line, city and postal code on the next), preserving every detail exactly as given. Do not invent or guess any address details that were not provided.
+2. Articulating the substance: rewrite only the section describing the complaint/issue or the information being requested into clear, professional, well-organised formal English suitable for a government office — proper grammar and logical structure — while preserving every fact, date, amount, name, and detail exactly as given. Do not add facts, embellish, or speculate beyond what was provided.
+
+Leave everything else in the letter completely unchanged: the recipient's name and address, the subject line, statutory citations, the closing, and the signature block must be reproduced verbatim.
+
+If any part of the letter still contains a bracketed placeholder like [Your Name], [Your Address], [NIC], or similar because the user left that field blank, leave that placeholder exactly as-is — do not remove it, fill it in, or fabricate a value. These placeholders must remain so the user can fill them in on the next screen.
+
+Output ONLY the final letter text, starting from the sender's address and ending with the signature block. Do not add any commentary, explanation, headers, or markdown code fences before or after the letter.`;
+
 const MAX_HISTORY = 20;
 
 export interface IncomingMessage {
@@ -71,4 +84,36 @@ export function getBaseURL(): string {
 
 export function getModel(): string {
   return process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
+}
+
+export function handleLLMError(err: unknown, model: string): Response {
+  if (err instanceof OpenAI.APIConnectionError) {
+    return Response.json(
+      {
+        error: `Could not connect to the Gemini API at ${getBaseURL()}. Check your network connection and that GEMINI_API_KEY is set.`,
+      },
+      { status: 503 },
+    );
+  }
+  if (err instanceof OpenAI.APIError) {
+    const status = err.status ?? 502;
+    let message = err.message || "The Gemini API returned an error.";
+    if (status === 401 || status === 403) {
+      message =
+        "Gemini API authentication failed. Check that GEMINI_API_KEY is set and valid.";
+    } else if (status === 404) {
+      message = `Model '${model}' is not a valid Gemini model. Check the GEMINI_MODEL environment variable.`;
+    } else if (status >= 500) {
+      message =
+        "The Gemini API is temporarily unavailable. Please try again in a moment.";
+    }
+    return Response.json({ error: message }, { status });
+  }
+  return Response.json(
+    {
+      error:
+        "Sorry — I couldn't reach the Gemini API. Check that GEMINI_API_KEY is set correctly.",
+    },
+    { status: 502 },
+  );
 }

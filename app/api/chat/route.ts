@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
   buildMessages,
-  getBaseURL,
   getLLMClient,
   getModel,
+  handleLLMError,
   type IncomingMessage,
 } from "@/lib/llm";
 import { retrieveContext } from "@/lib/rag";
@@ -115,36 +114,4 @@ export async function POST(req: Request) {
       "X-Accel-Buffering": "no",
     },
   });
-}
-
-function handleLLMError(err: unknown, model: string): Response {
-  if (err instanceof OpenAI.APIConnectionError) {
-    return NextResponse.json(
-      {
-        error: `Could not connect to the Gemini API at ${getBaseURL()}. Check your network connection and that GEMINI_API_KEY is set.`,
-      },
-      { status: 503 },
-    );
-  }
-  if (err instanceof OpenAI.APIError) {
-    const status = err.status ?? 502;
-    let message = err.message || "The Gemini API returned an error.";
-    if (status === 401 || status === 403) {
-      message =
-        "Gemini API authentication failed. Check that GEMINI_API_KEY is set and valid.";
-    } else if (status === 404) {
-      message = `Model '${model}' is not a valid Gemini model. Check the GEMINI_MODEL environment variable.`;
-    } else if (status >= 500) {
-      message =
-        "The Gemini API is temporarily unavailable. Please try again in a moment.";
-    }
-    return NextResponse.json({ error: message }, { status });
-  }
-  return NextResponse.json(
-    {
-      error:
-        "Sorry — I couldn't reach the Gemini API. Check that GEMINI_API_KEY is set correctly.",
-    },
-    { status: 502 },
-  );
 }

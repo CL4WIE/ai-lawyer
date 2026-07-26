@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Check, Copy, Download } from "lucide-react";
+import { Document, Packer, Paragraph } from "docx";
 import { Sidebar } from "./Sidebar";
 import { Button } from "@/components/ui/Button";
 import type { LegalDocument } from "@/types";
@@ -19,6 +20,7 @@ export function DocumentView({ documentId, user }: Props) {
   const [content, setContent] = useState("");
   const [copied, setCopied] = useState(false);
   const [sidebarKey, setSidebarKey] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,17 +68,29 @@ export function DocumentView({ documentId, user }: Props) {
     }
   }
 
-  function handleDownload() {
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const safe = (title || "document").replace(/[^\w\-]+/g, "_");
-    a.href = url;
-    a.download = `${safe}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  async function handleDownload() {
+    setIsDownloading(true);
+    try {
+      const doc = new Document({
+        sections: [
+          {
+            children: content.split("\n").map((line) => new Paragraph({ text: line })),
+          },
+        ],
+      });
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = (title || "document").replace(/[^\w\-]+/g, "_");
+      a.href = url;
+      a.download = `${safe}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   async function handleDelete() {
@@ -115,9 +129,9 @@ export function DocumentView({ documentId, user }: Props) {
                 </>
               )}
             </Button>
-            <Button size="sm" onClick={handleDownload}>
+            <Button size="sm" onClick={handleDownload} disabled={isDownloading}>
               <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Download
+              {isDownloading ? "Preparing…" : "Download"}
             </Button>
             <button
               onClick={handleDelete}

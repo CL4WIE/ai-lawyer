@@ -189,7 +189,7 @@ export function ChatShell({ initialDocumentId, user }: Props) {
         user={user}
       />
       <main className="flex min-w-0 flex-1 flex-col">
-        <ChatHeader onNewChat={handleNewChat} />
+        <ChatHeader onNewChat={handleNewChat} chatId={activeChatId} />
         {isEmpty ? (
           <div className="flex flex-1 flex-col">
             <div className="flex flex-1 items-center justify-center">
